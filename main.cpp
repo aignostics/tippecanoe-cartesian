@@ -2488,6 +2488,7 @@ int main(int argc, char **argv) {
 	std::map<std::string, std::string> attribute_descriptions;
 	int exclude_all = 0;
 	int read_parallel = 0;
+	bool projection_explicitly_set = false;
 	int files_open_at_start;
 	json_object *filter = NULL;
 
@@ -2703,9 +2704,17 @@ int main(int argc, char **argv) {
 			} else if (strcmp(opt, "use-attribute-for-id") == 0) {
 				attribute_for_id = optarg;
 			} else if (strcmp(opt, "cartesian") == 0) {
+				if (projection_explicitly_set) {
+					fprintf(stderr, "%s: --cartesian cannot be combined with --projection\n", argv[0]);
+					exit(EXIT_FAILURE);
+				}
 				cartesian_mode = true;
 				projection = get_projection("cartesian");
 			} else if (strcmp(opt, "cartesian-extent") == 0) {
+				if (projection_explicitly_set) {
+					fprintf(stderr, "%s: --cartesian-extent cannot be combined with --projection\n", argv[0]);
+					exit(EXIT_FAILURE);
+				}
 				if (sscanf(optarg, "%lf,%lf,%lf,%lf",
 				           &cartesian_extent[0], &cartesian_extent[1],
 				           &cartesian_extent[2], &cartesian_extent[3]) != 4) {
@@ -2989,7 +2998,12 @@ int main(int argc, char **argv) {
 			break;
 
 		case 's':
+			if (cartesian_mode) {
+				fprintf(stderr, "%s: --projection cannot be combined with --cartesian\n", argv[0]);
+				exit(EXIT_FAILURE);
+			}
 			set_projection_or_exit(optarg);
+			projection_explicitly_set = true;
 			break;
 
 		case 'S':
