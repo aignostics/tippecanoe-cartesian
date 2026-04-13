@@ -1103,13 +1103,16 @@ void choose_first_zoom(long long *file_bbox, std::vector<struct reader> &readers
 	// If the bounding box extends off the plane on either side,
 	// a feature wrapped across the date line, so the width of the
 	// bounding box is the whole world.
-	if (file_bbox[0] < 0) {
-		file_bbox[0] = 0;
-		file_bbox[2] = (1LL << 32) - 1;
-	}
-	if (file_bbox[2] > (1LL << 32) - 1) {
-		file_bbox[0] = 0;
-		file_bbox[2] = (1LL << 32) - 1;
+	// (Not applicable for Cartesian mode where coordinates don't wrap.)
+	if (!cartesian_mode) {
+		if (file_bbox[0] < 0) {
+			file_bbox[0] = 0;
+			file_bbox[2] = (1LL << 32) - 1;
+		}
+		if (file_bbox[2] > (1LL << 32) - 1) {
+			file_bbox[0] = 0;
+			file_bbox[2] = (1LL << 32) - 1;
+		}
 	}
 	if (file_bbox[1] < 0) {
 		file_bbox[1] = 0;
@@ -2300,14 +2303,14 @@ int read_input(std::vector<source> &sources, char *fname, int maxzoom, int minzo
 
 	double minlat = 0, minlon = 0, maxlat = 0, maxlon = 0, midlat = 0, midlon = 0;
 
-	tile2lonlat(midx, midy, maxzoom, &minlon, &maxlat);
-	tile2lonlat(midx + 1, midy + 1, maxzoom, &maxlon, &minlat);
+	projection->unproject(midx, midy, maxzoom, &minlon, &maxlat);
+	projection->unproject(midx + 1, midy + 1, maxzoom, &maxlon, &minlat);
 
 	midlat = (maxlat + minlat) / 2;
 	midlon = (maxlon + minlon) / 2;
 
-	tile2lonlat(file_bbox[0], file_bbox[1], 32, &minlon, &maxlat);
-	tile2lonlat(file_bbox[2], file_bbox[3], 32, &maxlon, &minlat);
+	projection->unproject(file_bbox[0], file_bbox[1], 32, &minlon, &maxlat);
+	projection->unproject(file_bbox[2], file_bbox[3], 32, &maxlon, &minlat);
 
 	if (midlat < minlat) {
 		midlat = minlat;
@@ -2485,6 +2488,7 @@ int main(int argc, char **argv) {
 	std::map<std::string, std::string> attribute_descriptions;
 	int exclude_all = 0;
 	int read_parallel = 0;
+	bool projection_explicitly_set = false;
 	int files_open_at_start;
 	json_object *filter = NULL;
 
@@ -2514,6 +2518,8 @@ int main(int argc, char **argv) {
 
 		{"Projection of input", 0, 0, 0},
 		{"projection", required_argument, 0, 's'},
+		{"cartesian", no_argument, 0, '~'},
+		{"cartesian-extent", required_argument, 0, '~'},
 
 		{"Zoom levels", 0, 0, 0},
 		{"maximum-zoom", required_argument, 0, 'z'},
@@ -2697,6 +2703,27 @@ int main(int argc, char **argv) {
 				}
 			} else if (strcmp(opt, "use-attribute-for-id") == 0) {
 				attribute_for_id = optarg;
+			} else if (strcmp(opt, "cartesian") == 0) {
+				if (projection_explicitly_set) {
+				fprintf(stderr, "%s: --cartesian cannot be combined with --projection/-s\n", argv[0]);
+					exit(EXIT_FAILURE);
+				}
+				cartesian_mode = true;
+				projection = get_projection("cartesian");
+			} else if (strcmp(opt, "cartesian-extent") == 0) {
+				if (projection_explicitly_set) {
+					fprintf(stderr, "%s: --cartesian-extent cannot be combined with --projection/-s\n", argv[0]);
+					exit(EXIT_FAILURE);
+				}
+				if (sscanf(optarg, "%lf,%lf,%lf,%lf",
+				           &cartesian_extent[0], &cartesian_extent[1],
+				           &cartesian_extent[2], &cartesian_extent[3]) != 4) {
+					fprintf(stderr, "%s: Can't parse Cartesian extent --%s=%s\n", argv[0], opt, optarg);
+					exit(EXIT_FAILURE);
+				}
+				cartesian_extent_set = true;
+				cartesian_mode = true;
+				projection = get_projection("cartesian");
 			} else {
 				fprintf(stderr, "%s: Unrecognized option --%s\n", argv[0], opt);
 				exit(EXIT_FAILURE);
@@ -2971,7 +2998,12 @@ int main(int argc, char **argv) {
 			break;
 
 		case 's':
+			if (cartesian_mode) {
+				fprintf(stderr, "%s: --projection/-s cannot be combined with --cartesian/--cartesian-extent\n", argv[0]);
+				exit(EXIT_FAILURE);
+			}
 			set_projection_or_exit(optarg);
+			projection_explicitly_set = true;
 			break;
 
 		case 'S':
@@ -3043,6 +3075,20 @@ int main(int argc, char **argv) {
 				exit(EXIT_FAILURE);
 			}
 		}
+		}
+	}
+
+	if (cartesian_mode) {
+		if (!cartesian_extent_set) {
+			fprintf(stderr, "%s: --cartesian requires --cartesian-extent=minx,miny,maxx,maxy\n", argv[0]);
+			exit(EXIT_FAILURE);
+		}
+		double width = cartesian_extent[2] - cartesian_extent[0];
+		double height = cartesian_extent[3] - cartesian_extent[1];
+		if (width <= 0 || height <= 0) {
+			fprintf(stderr, "%s: --cartesian-extent must have positive width and height (got %g,%g,%g,%g)\n",
+			        argv[0], cartesian_extent[0], cartesian_extent[1], cartesian_extent[2], cartesian_extent[3]);
+			exit(EXIT_FAILURE);
 		}
 	}
 

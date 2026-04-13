@@ -1226,7 +1226,7 @@ struct write_tile_args {
 bool clip_to_tile(serial_feature &sf, int z, long long buffer) {
 	int quick = quick_check(sf.bbox, z, buffer);
 
-	if (z == 0) {
+	if (z == 0 && !cartesian_mode) {
 		if (sf.bbox[0] <= (1LL << 32) * buffer / 256 || sf.bbox[2] >= (1LL << 32) - ((1LL << 32) * buffer / 256)) {
 			// If the geometry extends off the edge of the world, concatenate on another copy
 			// shifted by 360 degrees, and then make sure both copies get clipped down to size.

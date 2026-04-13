@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include "mvt.hpp"
 #include "mbtiles.hpp"
+#include "projection.hpp"
 #include "text.hpp"
 #include "milo/dtoa_milo.h"
 #include "write_json.hpp"
@@ -392,6 +393,28 @@ void mbtiles_write_metadata(sqlite3 *outdb, const char *outdir, const char *fnam
 		}
 	}
 	sqlite3_free(sql);
+
+	if (cartesian_mode) {
+		sql = sqlite3_mprintf("INSERT INTO metadata (name, value) VALUES ('cartesian', 'true');");
+		if (sqlite3_exec(db, sql, NULL, NULL, &err) != SQLITE_OK) {
+			fprintf(stderr, "set cartesian: %s\n", err);
+			if (!forcetable) {
+				exit(EXIT_FAILURE);
+			}
+		}
+		sqlite3_free(sql);
+
+		sql = sqlite3_mprintf("INSERT INTO metadata (name, value) VALUES ('cartesian_extent', '%.17g,%.17g,%.17g,%.17g');",
+		                      cartesian_extent[0], cartesian_extent[1],
+		                      cartesian_extent[2], cartesian_extent[3]);
+		if (sqlite3_exec(db, sql, NULL, NULL, &err) != SQLITE_OK) {
+			fprintf(stderr, "set cartesian_extent: %s\n", err);
+			if (!forcetable) {
+				exit(EXIT_FAILURE);
+			}
+		}
+		sqlite3_free(sql);
+	}
 
 	if (vector) {
 		size_t elements = max_tilestats_values;

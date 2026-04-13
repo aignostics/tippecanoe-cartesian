@@ -238,6 +238,10 @@ void decode(char *fname, int z, unsigned x, unsigned y, std::set<std::string> co
 				char *map = (char *) mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 				if (map != NULL && map != MAP_FAILED) {
 					if (strcmp(map, "SQLite format 3") != 0) {
+						if (cartesian_mode && !cartesian_extent_set) {
+							fprintf(stderr, "%s: --cartesian requires --cartesian-extent when decoding a PBF tile\n", fname);
+							exit(EXIT_FAILURE);
+						}
 						if (z >= 0) {
 							std::string s = std::string(map, st.st_size);
 							handle(s, z, x, y, to_decode, pipeline, stats, state);
@@ -281,6 +285,9 @@ void decode(char *fname, int z, unsigned x, unsigned y, std::set<std::string> co
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	// Auto-detect Cartesian mode from MBTiles metadata (CLI flags override)
+	set_cartesian_from_metadata(db);
 
 	if (z < 0) {
 		int within = 0;
@@ -504,6 +511,8 @@ int main(int argc, char **argv) {
 		{"stats", no_argument, 0, 'S'},
 		{"force", no_argument, 0, 'f'},
 		{"exclude-metadata-row", required_argument, 0, 'x'},
+		{"cartesian", no_argument, 0, '~'},
+		{"cartesian-extent", required_argument, 0, '~'},
 		{0, 0, 0, 0},
 	};
 
@@ -518,7 +527,8 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	while ((i = getopt_long(argc, argv, getopt_str.c_str(), long_options, NULL)) != -1) {
+	int option_index = 0;
+	while ((i = getopt_long(argc, argv, getopt_str.c_str(), long_options, &option_index)) != -1) {
 		switch (i) {
 		case 0:
 			break;
@@ -554,6 +564,35 @@ int main(int argc, char **argv) {
 		case 'x':
 			exclude_meta.insert(optarg);
 			break;
+
+		case '~': {
+			const char *opt = long_options[option_index].name;
+			if (strcmp(opt, "cartesian") == 0) {
+				cartesian_mode = true;
+				projection = get_projection("cartesian");
+			} else if (strcmp(opt, "cartesian-extent") == 0) {
+				if (sscanf(optarg, "%lf,%lf,%lf,%lf",
+				           &cartesian_extent[0], &cartesian_extent[1],
+				           &cartesian_extent[2], &cartesian_extent[3]) != 4) {
+					fprintf(stderr, "Can't parse Cartesian extent: %s\n", optarg);
+					exit(EXIT_FAILURE);
+				}
+				double width = cartesian_extent[2] - cartesian_extent[0];
+				double height = cartesian_extent[3] - cartesian_extent[1];
+				if (width <= 0 || height <= 0) {
+					fprintf(stderr, "--cartesian-extent must have positive width and height (got %g,%g,%g,%g)\n",
+					        cartesian_extent[0], cartesian_extent[1], cartesian_extent[2], cartesian_extent[3]);
+					exit(EXIT_FAILURE);
+				}
+				cartesian_extent_set = true;
+				cartesian_mode = true;
+				projection = get_projection("cartesian");
+			} else {
+				fprintf(stderr, "Unrecognized option: --%s\n", opt);
+				usage(argv);
+			}
+			break;
+		}
 
 		default:
 			usage(argv);

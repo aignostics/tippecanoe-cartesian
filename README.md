@@ -356,6 +356,22 @@ Parallel processing will also be automatic if the input file is in Geobuf format
 
  * `-s` _projection_ or `--projection=`_projection_: Specify the projection of the input data. Currently supported are `EPSG:4326` (WGS84, the default) and `EPSG:3857` (Web Mercator). In general you should use WGS84 for your input files if at all possible.
 
+### Cartesian coordinate mode
+
+ * `--cartesian`: Treat input coordinates as raw Cartesian x,y values instead of geographic longitude/latitude. Requires `--cartesian-extent`.
+ * `--cartesian-extent=`_minx_`,`_miny_`,`_maxx_`,`_maxy_: Define the coordinate space bounds for Cartesian mode. Coordinates outside this extent will be clipped.
+
+Use Cartesian mode for non-geographic data such as floor plans, game maps, or scientific coordinate systems. The projection is linear (no Mercator distortion). Aspect ratio is preserved — the larger dimension maps to the full tile space, and the shorter dimension is centered.
+
+`tippecanoe-decode` automatically detects Cartesian tilesets from the stored metadata and outputs the original Cartesian coordinates. The CRS is reported as `"cartesian"` in decoded output. Cannot be combined with `--projection`.
+
+Example:
+
+```
+tippecanoe --cartesian --cartesian-extent=0,0,1000,500 -z8 -f -o floor-plan.mbtiles floor-plan.json
+tippecanoe-decode floor-plan.mbtiles  # outputs Cartesian coordinates automatically
+```
+
 ### Zoom levels
 
  * `-z` _zoom_ or `--maximum-zoom=`_zoom_: Maxzoom: the highest zoom level for which tiles are generated (default 14)
@@ -372,31 +388,31 @@ or the map scale of a corresponding printed map,
 this table shows the approximate precision and scale corresponding to various
 `-z` options if you use the default `-d` detail of 12:
 
-zoom level | precision (ft) | precision (m) | map scale
----------- | -------------- | ------------- | ---------
-`-z0` | 32000 ft | 10000 m | 1:320,000,000
-`-z1` | 16000 ft | 5000 m | 1:160,000,000
-`-z2` | 8000 ft | 2500 m | 1:80,000,000
-`-z3` | 4000 ft | 1250 m | 1:40,000,000
-`-z4` | 2000 ft | 600 m | 1:20,000,000
-`-z5` | 1000 ft | 300 m | 1:10,000,000
-`-z6` | 500 ft | 150 m | 1:5,000,000
-`-z7` | 250 ft | 80 m | 1:2,500,000
-`-z8` | 125 ft | 40 m | 1:1,250,000
-`-z9` | 64 ft | 20 m | 1:640,000
-`-z10` | 32 ft | 10 m | 1:320,000
-`-z11` | 16 ft | 5 m | 1:160,000
-`-z12` | 8 ft | 2 m | 1:80,000
-`-z13` | 4 ft | 1 m | 1:40,000
-`-z14` | 2 ft | 0.5 m | 1:20,000
-`-z15` | 1 ft | 0.25 m | 1:10,000
-`-z16` | 6 in | 15 cm | 1:5000
-`-z17` | 3 in | 8 cm | 1:2500
-`-z18` | 1.5 in | 4 cm | 1:1250
-`-z19` | 0.8 in | 2 cm | 1:600
-`-z20` | 0.4 in | 1 cm | 1:300
-`-z21` | 0.2 in | 0.5 cm | 1:150
-`-z22` | 0.1 in | 0.25 cm | 1:75
+| zoom level | precision (ft) | precision (m) | map scale     |
+|------------|----------------|---------------|---------------|
+| `-z0`      | 32000 ft       | 10000 m       | 1:320,000,000 |
+| `-z1`      | 16000 ft       | 5000 m        | 1:160,000,000 |
+| `-z2`      | 8000 ft        | 2500 m        | 1:80,000,000  |
+| `-z3`      | 4000 ft        | 1250 m        | 1:40,000,000  |
+| `-z4`      | 2000 ft        | 600 m         | 1:20,000,000  |
+| `-z5`      | 1000 ft        | 300 m         | 1:10,000,000  |
+| `-z6`      | 500 ft         | 150 m         | 1:5,000,000   |
+| `-z7`      | 250 ft         | 80 m          | 1:2,500,000   |
+| `-z8`      | 125 ft         | 40 m          | 1:1,250,000   |
+| `-z9`      | 64 ft          | 20 m          | 1:640,000     |
+| `-z10`     | 32 ft          | 10 m          | 1:320,000     |
+| `-z11`     | 16 ft          | 5 m           | 1:160,000     |
+| `-z12`     | 8 ft           | 2 m           | 1:80,000      |
+| `-z13`     | 4 ft           | 1 m           | 1:40,000      |
+| `-z14`     | 2 ft           | 0.5 m         | 1:20,000      |
+| `-z15`     | 1 ft           | 0.25 m        | 1:10,000      |
+| `-z16`     | 6 in           | 15 cm         | 1:5000        |
+| `-z17`     | 3 in           | 8 cm          | 1:2500        |
+| `-z18`     | 1.5 in         | 4 cm          | 1:1250        |
+| `-z19`     | 0.8 in         | 2 cm          | 1:600         |
+| `-z20`     | 0.4 in         | 1 cm          | 1:300         |
+| `-z21`     | 0.2 in         | 0.5 cm        | 1:150         |
+| `-z22`     | 0.1 in         | 0.25 cm       | 1:75          |
 
 ### Tile resolution
 
@@ -881,6 +897,8 @@ resolutions.
 ### Options
 
  * `-s` _projection_ or `--projection=`*projection*: Specify the projection of the output data. Currently supported are EPSG:4326 (WGS84, the default) and EPSG:3857 (Web Mercator).
+ * `--cartesian`: Decode using Cartesian coordinates. Automatically detected from tileset metadata when decoding an MBTiles file created with `--cartesian`.
+ * `--cartesian-extent=`_minx_`,`_miny_`,`_maxx_`,`_maxy_: Override the Cartesian extent for decoding. Useful when decoding standalone PBF tiles created with `--cartesian`.
  * `-z` _maxzoom_ or `--maximum-zoom=`*maxzoom*: Specify the highest zoom level to decode from the tileset
  * `-Z` _minzoom_ or `--minimum-zoom=`*minzoom*: Specify the lowest zoom level to decode from the tileset
  * `-l` _layer_ or `--layer=`*layer*: Decode only layers with the specified names. (Multiple `-l` options can be specified.)
