@@ -238,6 +238,10 @@ void decode(char *fname, int z, unsigned x, unsigned y, std::set<std::string> co
 				char *map = (char *) mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 				if (map != NULL && map != MAP_FAILED) {
 					if (strcmp(map, "SQLite format 3") != 0) {
+						if (cartesian_mode && !cartesian_extent_set) {
+							fprintf(stderr, "%s: --cartesian requires --cartesian-extent when decoding a PBF tile\n", fname);
+							exit(EXIT_FAILURE);
+						}
 						if (z >= 0) {
 							std::string s = std::string(map, st.st_size);
 							handle(s, z, x, y, to_decode, pipeline, stats, state);
@@ -571,6 +575,13 @@ int main(int argc, char **argv) {
 				           &cartesian_extent[0], &cartesian_extent[1],
 				           &cartesian_extent[2], &cartesian_extent[3]) != 4) {
 					fprintf(stderr, "Can't parse Cartesian extent: %s\n", optarg);
+					exit(EXIT_FAILURE);
+				}
+				double width = cartesian_extent[2] - cartesian_extent[0];
+				double height = cartesian_extent[3] - cartesian_extent[1];
+				if (width <= 0 || height <= 0) {
+					fprintf(stderr, "--cartesian-extent must have positive width and height (got %g,%g,%g,%g)\n",
+					        cartesian_extent[0], cartesian_extent[1], cartesian_extent[2], cartesian_extent[3]);
 					exit(EXIT_FAILURE);
 				}
 				cartesian_extent_set = true;

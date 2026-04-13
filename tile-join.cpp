@@ -1053,6 +1053,13 @@ int main(int argc, char **argv) {
 					fprintf(stderr, "%s: Can't parse Cartesian extent: %s\n", argv[0], optarg);
 					exit(EXIT_FAILURE);
 				}
+				double width = cartesian_extent[2] - cartesian_extent[0];
+				double height = cartesian_extent[3] - cartesian_extent[1];
+				if (width <= 0 || height <= 0) {
+					fprintf(stderr, "%s: --cartesian-extent must have positive width and height (got %g,%g,%g,%g)\n",
+					        argv[0], cartesian_extent[0], cartesian_extent[1], cartesian_extent[2], cartesian_extent[3]);
+					exit(EXIT_FAILURE);
+				}
 				cartesian_extent_set = true;
 				cartesian_mode = true;
 				projection = get_projection("cartesian");
