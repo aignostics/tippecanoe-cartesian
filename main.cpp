@@ -2705,14 +2705,14 @@ int main(int argc, char **argv) {
 				attribute_for_id = optarg;
 			} else if (strcmp(opt, "cartesian") == 0) {
 				if (projection_explicitly_set) {
-					fprintf(stderr, "%s: --cartesian cannot be combined with --projection\n", argv[0]);
+				fprintf(stderr, "%s: --cartesian cannot be combined with --projection/-s\n", argv[0]);
 					exit(EXIT_FAILURE);
 				}
 				cartesian_mode = true;
 				projection = get_projection("cartesian");
 			} else if (strcmp(opt, "cartesian-extent") == 0) {
 				if (projection_explicitly_set) {
-					fprintf(stderr, "%s: --cartesian-extent cannot be combined with --projection\n", argv[0]);
+					fprintf(stderr, "%s: --cartesian-extent cannot be combined with --projection/-s\n", argv[0]);
 					exit(EXIT_FAILURE);
 				}
 				if (sscanf(optarg, "%lf,%lf,%lf,%lf",
@@ -2999,7 +2999,7 @@ int main(int argc, char **argv) {
 
 		case 's':
 			if (cartesian_mode) {
-				fprintf(stderr, "%s: --projection cannot be combined with --cartesian\n", argv[0]);
+				fprintf(stderr, "%s: --projection/-s cannot be combined with --cartesian/--cartesian-extent\n", argv[0]);
 				exit(EXIT_FAILURE);
 			}
 			set_projection_or_exit(optarg);
