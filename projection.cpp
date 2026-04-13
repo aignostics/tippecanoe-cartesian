@@ -3,14 +3,20 @@
 #include <stdlib.h>
 #include <math.h>
 #include <atomic>
+#include <sqlite3.h>
 #include "projection.hpp"
 
 unsigned long long (*encode_index)(unsigned int wx, unsigned int wy) = NULL;
 void (*decode_index)(unsigned long long index, unsigned *wx, unsigned *wy) = NULL;
 
+bool cartesian_mode = false;
+bool cartesian_extent_set = false;
+double cartesian_extent[4] = {0, 0, 0, 0};  // minx, miny, maxx, maxy
+
 struct projection projections[] = {
 	{"EPSG:4326", lonlat2tile, tile2lonlat, "urn:ogc:def:crs:OGC:1.3:CRS84"},
 	{"EPSG:3857", epsg3857totile, tiletoepsg3857, "urn:ogc:def:crs:EPSG::3857"},
+	{"cartesian", cartesian2tile, tile2cartesian, "cartesian"},
 	{NULL, NULL, NULL, NULL},
 };
 
@@ -99,6 +105,45 @@ void tiletoepsg3857(long long ix, long long iy, int zoom, double *ox, double *oy
 
 	*ox = (ix - (1LL << 31)) * M_PI * 6378137.0 / (1LL << 31);
 	*oy = ((1LL << 32) - 1 - iy - (1LL << 31)) * M_PI * 6378137.0 / (1LL << 31);
+}
+
+void cartesian2tile(double ix, double iy, int zoom, long long *ox, long long *oy) {
+	double width = cartesian_extent[2] - cartesian_extent[0];
+	double height = cartesian_extent[3] - cartesian_extent[1];
+	double range = (width > height) ? width : height;
+	if (range == 0) {
+		range = 1;
+	}
+	double cx = (cartesian_extent[0] + cartesian_extent[2]) / 2.0;
+	double cy = (cartesian_extent[1] + cartesian_extent[3]) / 2.0;
+
+	int ix_class = fpclassify(ix);
+	int iy_class = fpclassify(iy);
+	if (ix_class == FP_INFINITE || ix_class == FP_NAN) {
+		ix = cx;
+	}
+	if (iy_class == FP_INFINITE || iy_class == FP_NAN) {
+		iy = cy;
+	}
+
+	unsigned long long n = 1LL << zoom;
+	*ox = (long long)(((ix - cx) / range + 0.5) * n);
+	*oy = (long long)((0.5 - (iy - cy) / range) * n);
+}
+
+void tile2cartesian(long long ix, long long iy, int zoom, double *ox, double *oy) {
+	double width = cartesian_extent[2] - cartesian_extent[0];
+	double height = cartesian_extent[3] - cartesian_extent[1];
+	double range = (width > height) ? width : height;
+	if (range == 0) {
+		range = 1;
+	}
+	double cx = (cartesian_extent[0] + cartesian_extent[2]) / 2.0;
+	double cy = (cartesian_extent[1] + cartesian_extent[3]) / 2.0;
+
+	unsigned long long n = 1LL << zoom;
+	*ox = ((double) ix / n - 0.5) * range + cx;
+	*oy = (0.5 - (double) iy / n) * range + cy;
 }
 
 // https://en.wikipedia.org/wiki/Hilbert_curve
@@ -213,5 +258,46 @@ void set_projection_or_exit(const char *optarg) {
 	if (p->name == NULL) {
 		fprintf(stderr, "Unknown projection (-s): %s\n", optarg);
 		exit(EXIT_FAILURE);
+	}
+}
+
+struct projection *get_projection(const char *name) {
+	for (struct projection *p = projections; p->name != NULL; p++) {
+		if (strcmp(p->name, name) == 0) {
+			return p;
+		}
+	}
+	return NULL;
+}
+
+void set_cartesian_from_metadata(sqlite3 *db) {
+	if (!cartesian_mode) {
+		sqlite3_stmt *stmt;
+		if (sqlite3_prepare_v2(db, "SELECT value FROM metadata WHERE name = 'cartesian'", -1, &stmt, NULL) == SQLITE_OK) {
+			if (sqlite3_step(stmt) == SQLITE_ROW) {
+				const unsigned char *val = sqlite3_column_text(stmt, 0);
+				if (val != NULL && strcmp((char *) val, "true") == 0) {
+					cartesian_mode = true;
+					projection = get_projection("cartesian");
+				}
+			}
+			sqlite3_finalize(stmt);
+		}
+	}
+	if (cartesian_mode && !cartesian_extent_set) {
+		sqlite3_stmt *stmt;
+		if (sqlite3_prepare_v2(db, "SELECT value FROM metadata WHERE name = 'cartesian_extent'", -1, &stmt, NULL) == SQLITE_OK) {
+			if (sqlite3_step(stmt) == SQLITE_ROW) {
+				const unsigned char *val = sqlite3_column_text(stmt, 0);
+				if (val != NULL) {
+					if (sscanf((char *) val, "%lf,%lf,%lf,%lf",
+					           &cartesian_extent[0], &cartesian_extent[1],
+					           &cartesian_extent[2], &cartesian_extent[3]) == 4) {
+						cartesian_extent_set = true;
+					}
+				}
+			}
+			sqlite3_finalize(stmt);
+		}
 	}
 }

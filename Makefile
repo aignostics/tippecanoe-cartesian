@@ -82,7 +82,7 @@ indent:
 TESTS = $(wildcard tests/*/out/*.json)
 SPACE = $(NULL) $(NULL)
 
-test: tippecanoe tippecanoe-decode $(addsuffix .check,$(TESTS)) raw-tiles-test parallel-test pbf-test join-test enumerate-test decode-test join-filter-test unit json-tool-test allow-existing-test csv-test layer-json-test
+test: tippecanoe tippecanoe-decode $(addsuffix .check,$(TESTS)) raw-tiles-test parallel-test pbf-test join-test enumerate-test decode-test join-filter-test unit json-tool-test allow-existing-test csv-test layer-json-test cartesian-test
 	./unit
 
 suffixes = json json.gz
@@ -100,7 +100,17 @@ nogeobuf = tests/overflow/out/-z0.json $(wildcard tests/stringid/out/*.json)
 geobuf-test: tippecanoe-json-tool $(addsuffix .checkbuf,$(filter-out $(nogeobuf),$(TESTS)))
 
 # For quicker address sanitizer build, hope that regular JSON parsing is tested enough by parallel and join tests
-fewer-tests: tippecanoe tippecanoe-decode geobuf-test raw-tiles-test parallel-test pbf-test join-test enumerate-test decode-test join-filter-test unit
+fewer-tests: tippecanoe tippecanoe-decode geobuf-test raw-tiles-test parallel-test pbf-test join-test enumerate-test decode-test join-filter-test unit cartesian-test
+
+cartesian-test: tippecanoe tippecanoe-decode
+	./tippecanoe -q -z5 --cartesian --cartesian-extent=0,0,100,100 -f -n cartesian-points -o tests/cartesian/points.mbtiles.check tests/cartesian/points.json
+	./tippecanoe-decode -x generator -x generator_options tests/cartesian/points.mbtiles.check > tests/cartesian/points.mbtiles.json.check
+	cmp tests/cartesian/points.mbtiles.json.check tests/cartesian/points.mbtiles.json
+	rm -f tests/cartesian/points.mbtiles.check tests/cartesian/points.mbtiles.json.check
+	./tippecanoe -q -z3 --cartesian --cartesian-extent=-50,-50,50,50 -f -n cartesian-shapes -o tests/cartesian/shapes.mbtiles.check tests/cartesian/shapes.json
+	./tippecanoe-decode -x generator -x generator_options tests/cartesian/shapes.mbtiles.check > tests/cartesian/shapes.mbtiles.json.check
+	cmp tests/cartesian/shapes.mbtiles.json.check tests/cartesian/shapes.mbtiles.json
+	rm -f tests/cartesian/shapes.mbtiles.check tests/cartesian/shapes.mbtiles.json.check
 
 # XXX Use proper makefile rules instead of a for loop
 %.json.checkbuf:

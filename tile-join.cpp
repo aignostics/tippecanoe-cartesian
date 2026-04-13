@@ -647,8 +647,8 @@ void decode(struct reader *readers, std::map<std::string, layermap_entry> &layer
 		}
 
 		double lat1, lon1, lat2, lon2;
-		tile2lonlat(r->x, r->y, r->zoom, &lon1, &lat1);
-		tile2lonlat(r->x + 1, r->y + 1, r->zoom, &lon2, &lat2);
+		projection->unproject(r->x, r->y, r->zoom, &lon1, &lat1);
+		projection->unproject(r->x + 1, r->y + 1, r->zoom, &lon2, &lat2);
 		minlat = min(lat2, minlat);
 		minlon = min(lon1, minlon);
 		maxlat = max(lat1, maxlat);
@@ -840,6 +840,8 @@ void decode(struct reader *readers, std::map<std::string, layermap_entry> &layer
 			sqlite3_finalize(r->stmt);
 		}
 
+		set_cartesian_from_metadata(db);
+
 		// Closes either real db or temp mirror of metadata.json
 		if (sqlite3_close(db) != SQLITE_OK) {
 			fprintf(stderr, "Could not close database: %s\n", sqlite3_errmsg(db));
@@ -909,6 +911,9 @@ int main(int argc, char **argv) {
 		{"empty-csv-columns-are-null", no_argument, &pe, 1},
 		{"no-tile-stats", no_argument, &pg, 1},
 
+		{"cartesian", no_argument, 0, '~'},
+		{"cartesian-extent", required_argument, 0, '~'},
+
 		{0, 0, 0, 0},
 	};
 
@@ -929,7 +934,8 @@ int main(int argc, char **argv) {
 
 	std::string commandline = format_commandline(argc, argv);
 
-	while ((i = getopt_long(argc, argv, getopt_str.c_str(), long_options, NULL)) != -1) {
+	int option_index = 0;
+	while ((i = getopt_long(argc, argv, getopt_str.c_str(), long_options, &option_index)) != -1) {
 		switch (i) {
 		case 0:
 			break;
@@ -1034,6 +1040,28 @@ int main(int argc, char **argv) {
 		case 'q':
 			quiet = true;
 			break;
+
+		case '~': {
+			const char *opt = long_options[option_index].name;
+			if (strcmp(opt, "cartesian") == 0) {
+				cartesian_mode = true;
+				projection = get_projection("cartesian");
+			} else if (strcmp(opt, "cartesian-extent") == 0) {
+				if (sscanf(optarg, "%lf,%lf,%lf,%lf",
+				           &cartesian_extent[0], &cartesian_extent[1],
+				           &cartesian_extent[2], &cartesian_extent[3]) != 4) {
+					fprintf(stderr, "%s: Can't parse Cartesian extent: %s\n", argv[0], optarg);
+					exit(EXIT_FAILURE);
+				}
+				cartesian_extent_set = true;
+				cartesian_mode = true;
+				projection = get_projection("cartesian");
+			} else {
+				fprintf(stderr, "%s: Unrecognized option: --%s\n", argv[0], opt);
+				usage(argv);
+			}
+			break;
+		}
 
 		default:
 			usage(argv);
