@@ -1,0 +1,58 @@
+name: tippecanoe-cartesian
+id: ari:cloud:compass:fff788d2-8a2a-4c36-a884-dde2bb4a2b49:component/f65912bc-77bd-4e1f-b333-1a9e8f0ac32c/ec541751-9bf1-4aa5-abc0-8a7e8966a266
+description: Build vector tilesets from large collections of GeoJSON features.
+configVersion: 1
+typeId: SERVICE
+fields:
+  tier: 4
+links:
+  - name: null
+    type: REPOSITORY
+    url: https://github.com/aignostics/tippecanoe-cartesian
+relationships:
+  DEPENDS_ON: []
+labels:
+  - source:github
+customFields:
+  - name: CSV Approved
+    type: boolean
+    value: false
+  - name: Component Key
+    type: text
+    value: null
+  - name: Deployment Branch
+    type: text
+    value: null
+  - name: Development Branch
+    type: text
+    value: null
+  - name: FinOps Label
+    type: text
+    value: null
+  - name: Has external API
+    type: boolean
+    value: false
+  - name: Has external CLI
+    type: boolean
+    value: false
+  - name: Has external graphical UI
+    type: boolean
+    value: false
+  - name: Has internal API
+    type: boolean
+    value: false
+  - name: Has internal CLI
+    type: boolean
+    value: false
+  - name: Has internal graphical UI
+    type: boolean
+    value: false
+  - name: Is independently deployable
+    type: boolean
+    value: false
+  - name: Path in Repository
+    type: text
+    value: null
+  - name: Process Level
+    type: single_select
+    value: null
